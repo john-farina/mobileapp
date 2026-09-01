@@ -11,7 +11,46 @@ Everything upstream does still works. This fork changes **two files**.
 | File | Change |
 | --- | --- |
 | `gradle.properties` | `bugUrl=https://stone-channel-production.up.railway.app` |
-| `iosApp/Configuration/Config.xcconfig` | `BUNDLE_ID`, `APP_NAME=Stone`, `TEAM_ID` left for you |
+| `iosApp/Configuration/Config.xcconfig` | `TEAM_ID`, `BUNDLE_ID=com.johnfarina.stone`, `APP_NAME=Stone` |
+| `iosApp/iosApp.xcodeproj/project.pbxproj` | dropped the target-level `APP_NAME`/`BUNDLE_ID` overrides |
+| `androidApp/.../values/strings.xml` | `app_name` -> Stone |
+| `Assets.xcassets/AppIcon.appiconset` | the Stone logo |
+
+### Naming
+
+The target had `APP_NAME = Pebble` and `BUNDLE_ID = coredevices.coreapp`
+hardcoded in its build settings, which **override** anything in
+`Config.xcconfig` — so setting the xcconfig alone left the app called Pebble.
+Both target-level overrides are removed, making the xcconfig the single source
+of truth. Verify with:
+
+```shell
+cd iosApp && xcodebuild -workspace iosApp.xcworkspace -scheme iosApp \
+  -configuration Release -showBuildSettings | grep -E 'APP_NAME|PRODUCT_'
+```
+
+```
+APP_NAME = Stone
+PRODUCT_NAME = Stone
+PRODUCT_BUNDLE_IDENTIFIER = com.johnfarina.stone
+```
+
+Upstream sets `PRODUCT_BUNDLE_IDENTIFIER = "${BUNDLE_ID}${TEAM_ID}"` so that an
+unedited fork still gets a unique identifier. This fork sets `BUNDLE_ID`
+explicitly, so the suffix is dropped — otherwise the id would be
+`com.johnfarina.stoneK6TCM5Z5RP`, which is what the App Store Connect app record
+would then have to match.
+
+Naming it Stone rather than Pebble is also what upstream's README asks: the
+trademark should stay referential.
+
+### The icon
+
+`Assets.xcassets/AppIcon.appiconset/app-icon-1024.png` is rendered from
+`docs/stone/logo.svg` in the firmware repo, composited onto a light gradient so
+the dark watch body stays legible, and flattened to RGB. **iOS app icons must
+not carry an alpha channel** — a PNG with one is rejected at submission, so the
+render is deliberately opaque rather than transparent.
 
 No Kotlin was modified. The integration point already existed: `EngDashOta.kt`
 polls `GET $BUG_URL/ota/latest` and already understands the response shape the
