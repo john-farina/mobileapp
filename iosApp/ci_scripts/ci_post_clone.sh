@@ -75,6 +75,18 @@ mkdir -p iosApp/ci_scripts/TestFlight
   [ -f LEDGER.md ] && cat LEDGER.md || git log -1 --format=%B
 } > iosApp/ci_scripts/TestFlight/WhatToTest.en-US.txt
 
+echo "--- gradle heaps ---"
+# The upstream heaps (native 12g / daemon 6g / gradle 4g) still overflow on the
+# Xcode Cloud machine. GRADLE_USER_HOME properties take precedence over the
+# project's gradle.properties, so size them for a 64 GB box here and leave the
+# upstream file alone. Applies to the xcodebuild gradle phase too: same user.
+mkdir -p "$HOME/.gradle"
+cat >> "$HOME/.gradle/gradle.properties" <<'GRADLE'
+kotlin.native.jvmArgs=-Xmx24g
+kotlin.daemon.jvmargs=-Xmx12g
+org.gradle.jvmargs=-Xmx8g
+GRADLE
+
 echo "--- cocoapods ---"
 # Pods is not committed, so the workspace has no dependencies until this runs.
 # podInstall also generates the Kotlin framework podspec.
