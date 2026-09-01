@@ -87,6 +87,11 @@ jobs:
       # runs, which is where the room comes from. 4g was still not enough --
       # it then failed later, during body lowering.
       #
+      # The daemon stays at 2g: 1g moved the OOM earlier, into
+      # :experimental:compileKotlinIosArm64, which the daemon compiles. Gradle
+      # itself is the one that can live on 1g -- it orchestrates, it does not
+      # compile.
+      #
       # Done here rather than in gradle.properties so local builds keep the
       # headroom they can actually use.
       - name: Fit the JVM heaps to the runner
@@ -94,7 +99,7 @@ jobs:
           set -eu
           sed -i '' \
             -e 's/^kotlin\.native\.jvmArgs=.*/kotlin.native.jvmArgs=-Xmx5g/' \
-            -e 's/^kotlin\.daemon\.jvmargs=.*/kotlin.daemon.jvmargs=-Xmx1g/' \
+            -e 's/^kotlin\.daemon\.jvmargs=.*/kotlin.daemon.jvmargs=-Xmx2g/' \
             -e 's/^org\.gradle\.jvmargs=.*/org.gradle.jvmargs=-Xmx1g/' \
             gradle.properties
           echo "--- memory settings now ---"
