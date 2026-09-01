@@ -76,6 +76,26 @@ jobs:
           key: konan-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
           restore-keys: konan-${{ runner.os }}-
 
+      # gradle.properties is tuned for a developer machine: -Xmx12g for the
+      # Kotlin/Native compiler, 6g for the Kotlin daemon, 4g for Gradle. A
+      # macos-15 runner has 7 GB in total, so release linking dies with
+      # `java.lang.OutOfMemoryError: Java heap space` in
+      # linkPodReleaseFrameworkIosArm64. Trim to fit the runner rather than
+      # editing gradle.properties, which would slow local builds down for no
+      # reason.
+      - name: Fit the JVM heaps to the runner
+        run: |
+          set -eu
+          sed -i '' \
+            -e 's/^kotlin\.native\.jvmArgs=.*/kotlin.native.jvmArgs=-Xmx4g/' \
+            -e 's/^kotlin\.daemon\.jvmargs=.*/kotlin.daemon.jvmargs=-Xmx2g/' \
+            -e 's/^org\.gradle\.jvmargs=.*/org.gradle.jvmargs=-Xmx2g/' \
+            gradle.properties
+          echo "--- memory settings now ---"
+          grep -E 'jvmArgs|jvmargs' gradle.properties
+          echo "--- runner memory ---"
+          sysctl -n hw.memsize | awk '{printf "%.1f GB\n", $1/1024/1024/1024}'
+
       - name: Tag this build
         id: version
         run: |
