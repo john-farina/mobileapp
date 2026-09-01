@@ -98,7 +98,7 @@ jobs:
         run: |
           set -eu
           sed -i '' \
-            -e 's/^kotlin\.native\.jvmArgs=.*/kotlin.native.jvmArgs=-Xmx5g/' \
+            -e 's/^kotlin\.native\.jvmArgs=.*/kotlin.native.jvmArgs=-Xmx6g/' \
             -e 's/^kotlin\.daemon\.jvmargs=.*/kotlin.daemon.jvmargs=-Xmx2g/' \
             -e 's/^org\.gradle\.jvmargs=.*/org.gradle.jvmargs=-Xmx1g/' \
             gradle.properties
