@@ -41,7 +41,13 @@ import androidx.compose.material3.SnackbarHostState
 import coredevices.pebble.services.StoneBuild
 import coredevices.pebble.services.StoneBundleInstaller
 import coredevices.pebble.services.StoneChannel
+import coredevices.pebble.rememberLibPebble
 import coredevices.pebble.services.StoneChannels
+import io.rebble.libpebblecommon.connection.ConnectedPebble
+import io.rebble.libpebblecommon.connection.ConnectedPebbleDevice
+import io.rebble.libpebblecommon.connection.KnownPebbleDevice
+import io.rebble.libpebblecommon.connection.AppContext
+import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -57,6 +63,49 @@ fun StoneChannelsScreen(coreNav: CoreNav) {
     val installer: StoneBundleInstaller = koinInject()
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
+    val libPebble = rememberLibPebble()
+    val appContext: AppContext = koinInject()
+    val watches by libPebble.watches.collectAsState()
+
+    // The build currently on the wrist, so the list can say which one you are
+    // running rather than making you compare version strings by eye.
+    val connected = watches.firstOrNull { it is ConnectedPebbleDevice }
+    val runningVersion = (connected as? KnownPebbleDevice)?.runningFwVersion
+
+    // Per-build progress, keyed by version.
+    val status = remember { mutableStateMapOf<String, String>() }
+
+    fun install(channelName: String, build: StoneBuild) {
+        // The watch is already connected and collected above, so use it directly
+        // rather than re-acquiring it -- the helper that waits for a connection
+        // is private to DebugFirmwareSideload.
+        val firmware = connected as? ConnectedPebble.Firmware
+        if (firmware == null) {
+            scope.launch { snackbar.showSnackbar("No connected watch that can take a firmware update") }
+            return
+        }
+        scope.launch {
+            status[build.version] = "Downloading…"
+            val path = getTempFwPath(appContext)
+            installer.download(channelName, build, path)
+                .onFailure {
+                    status[build.version] = it.message ?: "Download failed"
+                    snackbar.showSnackbar(it.message ?: "Download failed")
+                }
+                .onSuccess {
+                    status[build.version] = "Verified, installing…"
+                    runCatching {
+                        firmware.sideloadFirmware(path)
+                    }.onFailure { e ->
+                        status[build.version] = e.message ?: "Install failed"
+                        snackbar.showSnackbar(e.message ?: "Install failed")
+                    }.onSuccess {
+                        status[build.version] = "Sent to watch"
+                        snackbar.showSnackbar("Sent ${build.version} to the watch")
+                    }
+                }
+        }
+    }
 
     var channels by remember { mutableStateOf<List<StoneChannel>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -132,6 +181,9 @@ fun StoneChannelsScreen(coreNav: CoreNav) {
                             onShowUrl = { url ->
                                 scope.launch { snackbar.showSnackbar(url) }
                             },
+                            runningVersion = runningVersion,
+                            statusFor = { b -> status[b.version] },
+                            onInstall = { b -> install(channel.channel, b) },
                             onToggle = {
                                 if (expanded.containsKey(channel.channel)) {
                                     expanded.remove(channel.channel)
@@ -160,6 +212,9 @@ private fun ChannelCard(
     loadingBuilds: Boolean,
     urlFor: (StoneBuild) -> String?,
     onShowUrl: (String) -> Unit,
+    runningVersion: String?,
+    statusFor: (StoneBuild) -> String?,
+    onInstall: (StoneBuild) -> Unit,
     onToggle: () -> Unit,
 ) {
     Card(
@@ -209,12 +264,23 @@ private fun ChannelCard(
                         style = MaterialTheme.typography.labelMedium,
                     )
                     list.forEach { build ->
+                        val isRunning = runningVersion != null && build.version == runningVersion
                         Column(Modifier.padding(top = 8.dp)) {
-                            Text(
-                                build.version,
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    build.version,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = FontFamily.Monospace,
+                                )
+                                if (isRunning) {
+                                    Text(
+                                        "  ON WATCH",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                }
+                            }
                             build.notes.firstOrNull()?.let {
                                 Text(it, style = MaterialTheme.typography.bodySmall)
                             }
@@ -239,6 +305,15 @@ private fun ChannelCard(
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.error,
                                 )
+                            }
+                            statusFor(build)?.let {
+                                Text(it, style = MaterialTheme.typography.labelSmall)
+                            }
+                            if (!isRunning && build.sha256 != null) {
+                                Button(
+                                    onClick = { onInstall(build) },
+                                    modifier = Modifier.padding(top = 4.dp),
+                                ) { Text("Install") }
                             }
                         }
                     }
