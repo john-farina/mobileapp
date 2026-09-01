@@ -32,8 +32,8 @@ env:
 
 jobs:
   testflight:
-    runs-on: macos-15
-    timeout-minutes: 90
+    runs-on: [self-hosted, macos, arm64]
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -51,61 +51,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-
-      # Kotlin/Native is the bulk of a ~40 minute archive, and ~/.konan holds
-      # its toolchain and compiled dependencies -- the single biggest win.
-      #
-      # CocoaPods is deliberately NOT cached. Restoring ~/Library/Caches/CocoaPods
-      # onto a fresh runner leaves it pointing at lock files that were never
-      # restored with it, and `pod install` dies with
-      # `Errno::ENOENT ... FirebaseInstallations/<version>.lock`. It manages that
-      # directory itself and does not tolerate having it put back underneath it.
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml', 'gradle.properties') }}
-          restore-keys: gradle-${{ runner.os }}-
-
-      - name: Cache Kotlin/Native
-        uses: actions/cache@v4
-        with:
-          path: ~/.konan
-          key: konan-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
-          restore-keys: konan-${{ runner.os }}-
-
-      # gradle.properties is tuned for a developer machine: -Xmx12g for the
-      # Kotlin/Native compiler, 6g for the Kotlin daemon, 4g for Gradle. A
-      # macos-15 runner has 7.0 GB in total, so release linking dies with
-      # `java.lang.OutOfMemoryError: Java heap space` in
-      # linkPodReleaseFrameworkIosArm64.
-      #
-      # The OOM is in the Kotlin/Native compiler's own JVM, so that is the heap
-      # that has to grow; the Gradle and Kotlin daemons are near idle while it
-      # runs, which is where the room comes from. 4g was still not enough --
-      # it then failed later, during body lowering.
-      #
-      # The daemon stays at 2g: 1g moved the OOM earlier, into
-      # :experimental:compileKotlinIosArm64, which the daemon compiles. Gradle
-      # itself is the one that can live on 1g -- it orchestrates, it does not
-      # compile.
-      #
-      # Done here rather than in gradle.properties so local builds keep the
-      # headroom they can actually use.
-      - name: Fit the JVM heaps to the runner
-        run: |
-          set -eu
-          sed -i '' \
-            -e 's/^kotlin\.native\.jvmArgs=.*/kotlin.native.jvmArgs=-Xmx6g/' \
-            -e 's/^kotlin\.daemon\.jvmargs=.*/kotlin.daemon.jvmargs=-Xmx2g/' \
-            -e 's/^org\.gradle\.jvmargs=.*/org.gradle.jvmargs=-Xmx1g/' \
-            gradle.properties
-          echo "--- memory settings now ---"
-          grep -E 'jvmArgs|jvmargs' gradle.properties
-          echo "--- runner memory ---"
-          sysctl -n hw.memsize | awk '{printf "%.1f GB\n", $1/1024/1024/1024}'
 
       - name: Tag this build
         id: version

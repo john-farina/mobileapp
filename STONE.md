@@ -124,6 +124,44 @@ Issuer ID from the same page.
 | `ASC_PRIVATE_KEY` | the **entire** contents of the `.p8`, including the BEGIN/END lines |
 | `APPLE_TEAM_ID` | `K6TCM5Z5RP` |
 
+### Why the build runs on a self-hosted runner
+
+A GitHub-hosted `macos-15` runner has **7.0 GB of RAM**, and
+`linkPodReleaseFrameworkIosArm64` -- the Kotlin/Native release link -- needs more
+heap than that can spare alongside the Kotlin daemon. Every split was tried:
+
+| native / daemon / gradle | Result |
+| --- | --- |
+| 12g / 6g / 4g (upstream defaults) | OOM in the release link |
+| 4g / 2g / 2g | OOM later, during body lowering |
+| 5g / 1g / 1g | OOM moved earlier, into `:experimental:compileKotlinIosArm64` |
+| 5g / 2g / 1g | OOM in the release link |
+| 6g / 2g / 1g | OOM in the release link |
+
+The daemon needs 2g or module compilation fails; the native compiler needs more
+than 6g; the machine has 7. There is no split that fits, so the build runs on a
+real Mac instead.
+
+That machine also keeps `~/.gradle` and `~/.konan` between runs, so no
+`actions/cache` steps are needed -- and the heaps in `gradle.properties` are used
+as written rather than trimmed.
+
+```{warning}
+**This repository is public, and a self-hosted runner on a public repository is a
+known risk.** For `pull_request` events GitHub runs the workflow file from the
+PR's head, so a fork PR can add `runs-on: self-hosted` and execute arbitrary code
+on the runner -- which here is a personal Mac holding signing identities and SSH
+keys.
+
+The mitigation in place is
+`actions/permissions/fork-pr-contributor-approval: all_external_contributors`,
+so **every** external PR needs manual approval before any workflow runs. That is
+a human gate: approving a PR without reading its workflow diff defeats it.
+
+Making this repository private removes the entire class of attack, and is what
+GitHub recommends for self-hosted runners.
+```
+
 ### How the version works
 
 A build phase in `iosApp.xcodeproj` runs `git describe --tags --abbrev=0` and
