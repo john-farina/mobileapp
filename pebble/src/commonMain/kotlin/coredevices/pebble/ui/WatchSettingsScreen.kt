@@ -1451,6 +1451,15 @@ fun rememberSettingsItemsState(navBarNav: NavBarNav?, snackbarDisplay: SnackbarD
                     },
                     isDebugSetting = true,
                 ),
+                basicSettingsActionItem(
+                    title = "Stone channels",
+                    description = "Every firmware branch that has published a build, and its history",
+                    keywords = "stone channel branch firmware build ota",
+                    topLevelType = TopLevelType.Phone,
+                    section = Section.Debug,
+                    action = { navBarNav?.navigateTo(PebbleRoutes.StoneChannelsRoute) },
+                    isDebugSetting = true,
+                ),
                 basicSettingsToggleItem(
                     title = "Use Core OTA service",
                     description = "Check Core Devices service for Core watch firmware updates instead of Memfault (falls back to Memfault on failure)",

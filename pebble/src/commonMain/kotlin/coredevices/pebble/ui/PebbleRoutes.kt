@@ -28,6 +28,9 @@ object PebbleRoutes {
     data class FirmwareSideloadRoute(val identifier: String) : CoreRoute
 
     @Serializable
+    data object StoneChannelsRoute : CoreRoute
+
+    @Serializable
     data class WatchappSettingsRoute(
         val watchIdentifier: String,
         val title: String,
@@ -295,6 +298,9 @@ fun NavGraphBuilder.addPebbleRoutes(
     composable<PebbleRoutes.FirmwareSideloadRoute> {
         val route: PebbleRoutes.FirmwareSideloadRoute = it.toRoute()
         DebugFirmwareSideload(route.identifier, coreNav)
+    }
+    composable<PebbleRoutes.StoneChannelsRoute> {
+        StoneChannelsScreen(coreNav)
     }
     composable<PebbleRoutes.WatchappSettingsRoute> {
         val route: PebbleRoutes.WatchappSettingsRoute = it.toRoute()

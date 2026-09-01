@@ -74,6 +74,9 @@ kotlin {
         commonMain {
             dependencies {
                 implementation(project(":libpebble3"))
+                // Firmware bundles are verified against the sha256 the channel
+                // server publishes before anything is flashed to a watch.
+                implementation(libs.okio)
                 implementation(libs.health.kmp)
                 implementation(compose.runtime)
                 implementation(compose.foundation)
