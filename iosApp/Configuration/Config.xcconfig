@@ -1,3 +1,14 @@
+// Stone — a personal fork of the Pebble companion app.
+//
+// TEAM_ID is yours: developer.apple.com/account -> Membership -> Team ID.
+// Leave it blank to let Xcode use whatever team you pick in Signing &
+// Capabilities; set it to make command-line builds reproducible.
+//
+// BUNDLE_ID must be unique to you and must not collide with the official app,
+// or the two will fight over the same identity on the phone.
+//
+// APP_NAME avoids "Pebble": upstream's README asks that the trademark stay
+// referential ("Awesome App for Pebble" is fine, "Pebble Awesome" is not).
 TEAM_ID=
-BUNDLE_ID=coredevices.coreapp
-APP_NAME=CoreApp
+BUNDLE_ID=com.johnfarina.stone
+APP_NAME=Stone
