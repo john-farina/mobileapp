@@ -1,0 +1,147 @@
+name: Stone TestFlight
+
+# Every push to `stone` cuts a signed build and ships it to TestFlight, so the
+# watch's companion app can be updated from the phone without a Mac.
+#
+# The version comes from a git tag. A build phase in iosApp.xcodeproj runs
+# `git describe --tags --abbrev=0` and parses X.Y.Z or X.Y.Z.B, hard-erroring on
+# anything else -- so the tag is created here rather than left to chance, with
+# the run number as the build component. TestFlight rejects a CFBundleVersion it
+# has already seen, and run numbers never repeat.
+
+on:
+  push:
+    branches: [stone]
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Marketing version (X.Y.Z)"
+        required: false
+        default: "1.0.0"
+
+concurrency:
+  group: stone-testflight
+  cancel-in-progress: false
+
+env:
+  MARKETING_VERSION: ${{ inputs.version || '1.0.0' }}
+  SCHEME: iosApp
+  WORKSPACE: iosApp/iosApp.xcworkspace
+
+jobs:
+  testflight:
+    runs-on: macos-15
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The version build phase runs `git describe`, which needs real
+          # history -- a shallow clone makes it fail rather than fall back.
+          fetch-depth: 0
+
+      - name: Show the toolchain
+        run: xcodebuild -version && xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Tag this build
+        id: version
+        run: |
+          set -eu
+          tag="${MARKETING_VERSION}.${GITHUB_RUN_NUMBER}"
+          git -c user.name="Stone CI" -c user.email="stone@localhost" \
+            tag -fa "$tag" -m "TestFlight build $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Building $tag (CFBundleVersion ${GITHUB_RUN_NUMBER})"
+
+      - name: Install CocoaPods dependencies
+        run: ./gradlew podInstall --no-daemon --stacktrace
+
+      - name: Write the App Store Connect API key
+        env:
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          set -eu
+          mkdir -p ~/private_keys
+          printf '%s' "$ASC_PRIVATE_KEY" > ~/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+          chmod 600 ~/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+
+      # -allowProvisioningUpdates lets xcodebuild create the App ID and profile
+      # through the API key, so nothing has to be committed or pre-registered by
+      # hand beyond the app record itself.
+      - name: Archive
+        run: |
+          set -eu
+          xcodebuild archive \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Stone.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8 \
+            -authenticationKeyID ${{ secrets.ASC_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.ASC_ISSUER_ID }} \
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Export the ipa
+        run: |
+          set -eu
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>uploadSymbols</key><true/>
+            <key>signingStyle</key><string>automatic</string>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Stone.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8 \
+            -authenticationKeyID ${{ secrets.ASC_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.ASC_ISSUER_ID }}
+
+      - name: Upload to TestFlight
+        run: |
+          set -eu
+          ipa=$(find "$RUNNER_TEMP/export" -name '*.ipa' | head -1)
+          [ -n "$ipa" ] || { echo "::error::no ipa produced"; exit 1; }
+          echo "uploading $(basename "$ipa")"
+          xcrun altool --upload-app -f "$ipa" -t ios \
+            --apiKey ${{ secrets.ASC_KEY_ID }} \
+            --apiIssuer ${{ secrets.ASC_ISSUER_ID }}
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Stone TestFlight"
+            echo ""
+            echo "- version: \`${{ steps.version.outputs.tag }}\`"
+            echo "- CFBundleVersion: \`${GITHUB_RUN_NUMBER}\`"
+            echo "- commit: \`${GITHUB_SHA:0:9}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the archive when something goes wrong
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stone-archive-${{ github.run_number }}
+          path: ${{ runner.temp }}/Stone.xcarchive
+          retention-days: 5

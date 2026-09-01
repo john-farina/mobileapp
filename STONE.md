@@ -48,7 +48,70 @@ not public.
 ("nothing new"), that is a *success*, so the app stops there and does not go on
 to check Cohorts. The toggle is the way to switch sources, not a merge.
 
-## Building it
+## TestFlight on every push
+
+`.github/workflows/stone-testflight.yml` builds and ships to TestFlight on every
+push to `stone`, so the app can be updated from the phone with no Mac involved.
+
+### One-time setup
+
+**1. Create the app record.** TestFlight will not accept a build for a bundle ID
+that has no app in App Store Connect. At
+<https://appstoreconnect.apple.com/apps> → **+** → **New App**:
+
+| Field | Value |
+| --- | --- |
+| Platform | iOS |
+| Bundle ID | `com.johnfarina.stone` — pick it from the list |
+| SKU | anything unique, e.g. `stone-companion` |
+| Name | must be unique across the whole App Store; "Stone" alone is likely taken |
+
+If the bundle ID is not in the list, build once from Xcode first — that
+registers it.
+
+**2. Create an App Store Connect API key.**
+<https://appstoreconnect.apple.com/access/integrations/api> → **Keys** →
+**+** → access **App Manager** → **Generate**. Download the `.p8`
+**immediately**; Apple allows exactly one download. Note the Key ID and the
+Issuer ID from the same page.
+
+**3. Add three repository secrets** at
+`Settings → Secrets and variables → Actions`:
+
+| Secret | Value |
+| --- | --- |
+| `ASC_KEY_ID` | the Key ID, e.g. `A1B2C3D4E5` |
+| `ASC_ISSUER_ID` | the Issuer ID (a UUID) |
+| `ASC_PRIVATE_KEY` | the **entire** contents of the `.p8`, including the BEGIN/END lines |
+| `APPLE_TEAM_ID` | `K6TCM5Z5RP` |
+
+### How the version works
+
+A build phase in `iosApp.xcodeproj` runs `git describe --tags --abbrev=0` and
+parses the tag as `X.Y.Z` or `X.Y.Z.B`, where `B` becomes `CFBundleVersion`. It
+**hard-errors on any other shape**, so the workflow creates the tag itself:
+
+```
+1.0.0.<github.run_number>
+```
+
+Run numbers never repeat, which matters because TestFlight rejects a
+`CFBundleVersion` it has already seen. Change the marketing version by running
+the workflow manually with a different `version` input.
+
+The tag is created in the runner and never pushed — it only has to exist for
+`git describe` during the build.
+
+### What the fork already fixed for CI
+
+- `iosApp/iosApp/GoogleService-Info.plist` — copied from the dummy upstream
+  ships. The Crashlytics build phase references this path in Release builds and
+  fails without it.
+- `iosApp/iosApp/iosApp.entitlements` — dropped
+  `applinks:cloud.repebble.com`. That is Core's domain; an associated-domains
+  entitlement for a domain you do not control is at best useless.
+
+## Building it locally
 
 Prerequisites (from upstream's README):
 
