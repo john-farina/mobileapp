@@ -9,6 +9,6 @@
 //
 // APP_NAME avoids "Pebble": upstream's README asks that the trademark stay
 // referential ("Awesome App for Pebble" is fine, "Pebble Awesome" is not).
-TEAM_ID=
+TEAM_ID=K6TCM5Z5RP
 BUNDLE_ID=com.johnfarina.stone
 APP_NAME=Stone
