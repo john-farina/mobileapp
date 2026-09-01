@@ -50,15 +50,41 @@ echo "--- version tag ---"
 #
 # CI_BUILD_NUMBER is Xcode Cloud's own monotonic counter, which is exactly what
 # CFBundleVersion wants: TestFlight rejects a build number it has seen before.
+#
+# TestFlight groups builds by CFBundleShortVersionString, so each branch gets
+# its own section by owning a version: stone is 1.0.0, feat/<n>-anything is
+# 1.<n>.0, and anything else is 1.999.0 so it is visible but obviously stray.
+case "${CI_BRANCH:-}" in
+  stone) VERSION="1.0.0" ;;
+  feat/[0-9]*) VERSION="1.$(echo "$CI_BRANCH" | sed -E 's#^feat/([0-9]+).*#\1#').0" ;;
+  *) VERSION="1.999.0" ;;
+esac
 if ! git describe --tags --abbrev=0 >/dev/null 2>&1; then
   git -c user.name="Xcode Cloud" -c user.email="ci@localhost" \
-    tag -a "1.0.0.${CI_BUILD_NUMBER:-1}" -m "Xcode Cloud build ${CI_BUILD_NUMBER:-1}"
+    tag -a "${VERSION}.${CI_BUILD_NUMBER:-1}" -m "Xcode Cloud build ${CI_BUILD_NUMBER:-1} of ${CI_BRANCH:-?}"
 fi
 echo "version tag: $(git describe --tags --abbrev=0)"
+
+echo "--- what to test ---"
+# Xcode Cloud reads ci_scripts/TestFlight/WhatToTest.<locale>.txt as the
+# build's TestFlight notes. A branch's LEDGER.md is that text.
+mkdir -p iosApp/ci_scripts/TestFlight
+{
+  echo "branch: ${CI_BRANCH:-?}  commit: $(git rev-parse --short HEAD)"
+  echo
+  [ -f LEDGER.md ] && cat LEDGER.md || git log -1 --format=%B
+} > iosApp/ci_scripts/TestFlight/WhatToTest.en-US.txt
 
 echo "--- cocoapods ---"
 # Pods is not committed, so the workspace has no dependencies until this runs.
 # podInstall also generates the Kotlin framework podspec.
 ./gradlew podInstall --no-daemon --stacktrace
+
+# The Xcode build phase's gradle run would otherwise execute these two tasks in
+# parallel, and two `pod install`s copying FirebaseFirestoreGRPCCPPBinary out of
+# the same CocoaPods cache at once fail with Errno::ENOENT. Run them one at a
+# time here so the build phase finds them UP-TO-DATE.
+./gradlew :experimental:podInstallSyntheticIos --no-daemon
+./gradlew :composeApp:podInstallSyntheticIos --no-daemon
 
 echo "--- ready ---"

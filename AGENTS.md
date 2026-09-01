@@ -58,3 +58,25 @@ Match the firmware fork's conventions so the two repos read alike:
 - co-author trailer: `Co-Authored-By: Claude <noreply@anthropic.com>`
 
 Use `stone:` for fork-local work and `ci:` for workflow changes.
+
+## Feature branches (agents start here)
+
+Every push to any branch is archived by Xcode Cloud and lands in TestFlight, so
+a feature is testable on a phone without anyone doing anything.
+
+- **Branch name: `feat/<n>-<slug>`**, where `<n>` is the next unused integer
+  (`git branch -r | grep feat/` shows the taken ones). The number is the
+  version: `feat/12-channel-filter` archives as `1.12.0 (build)`, which gives
+  the branch its own section in TestFlight. `stone` is `1.0.0`. A branch that
+  does not follow the pattern shows up as `1.999.0`.
+- **Branch from `stone`**, never `master`.
+- **Keep `LEDGER.md` at the repo root** and update it in every commit. It is
+  the handoff document for the next agent and it is also the build's TestFlight
+  notes, so write it for a reader on a phone. Sections, in this order:
+  1. **What** — the feature in two sentences
+  2. **Status** — what works, what does not, what is untested
+  3. **Decisions** — each choice and why, including what was rejected
+  4. **Changes** — files touched and what changed in each
+  5. **Next** — what is left, concrete enough to start from
+- Delete `LEDGER.md` in the commit that merges the branch into `stone`; its
+  content belongs in `STONE.md` by then.
