@@ -24,6 +24,14 @@ PATH="$JAVA_HOME/bin:$PATH"
 export PATH
 java -version
 
+# The Xcode build phase that runs gradlew (the composeApp podspec's
+# "Build composeApp" script) inherits nothing exported here, and brew's JDK is
+# keg-only, so /usr/bin/java finds nothing. Registering the JDK where
+# /usr/libexec/java_home scans makes it resolvable with no environment at all.
+mkdir -p "$HOME/Library/Java/JavaVirtualMachines"
+ln -sfn "$(brew --prefix openjdk@17)/libexec/openjdk.jdk" "$HOME/Library/Java/JavaVirtualMachines/openjdk-17.jdk"
+/usr/libexec/java_home -v 17
+
 echo "--- android sdk ---"
 # The Gradle build configures an Android target even for an iOS-only archive, so
 # it needs an SDK location. The command line tools are enough; Android Studio is
