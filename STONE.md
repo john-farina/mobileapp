@@ -181,7 +181,7 @@ The tag is created in the runner and never pushed — it only has to exist for
 
 ### What the fork already fixed for CI
 
-- `iosApp/iosApp/GoogleService-Info.plist` — copied from the dummy upstream
+- `iosApp/iosApp/GoogleService-Info.plist` — gitignored, so `ci_post_clone.sh` copies the dummy upstream
   ships. The Crashlytics build phase references this path in Release builds and
   fails without it.
 - `iosApp/iosApp/iosApp.entitlements` — dropped

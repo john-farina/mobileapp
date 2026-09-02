@@ -87,6 +87,11 @@ kotlin.daemon.jvmargs=-Xmx12g
 org.gradle.jvmargs=-Xmx8g
 GRADLE
 
+echo "--- firebase plist ---"
+# The Crashlytics build phase reads GoogleService-Info.plist in Release. The
+# real one is gitignored, so use the dummy upstream ships.
+cp iosApp/iosApp/GoogleService-Info-dummy.plist iosApp/iosApp/GoogleService-Info.plist
+
 echo "--- cocoapods ---"
 # Pods is not committed, so the workspace has no dependencies until this runs.
 # podInstall also generates the Kotlin framework podspec.
