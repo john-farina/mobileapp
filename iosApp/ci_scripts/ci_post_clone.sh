@@ -15,6 +15,38 @@ sysctl -n hw.ncpu | awk '{print "cores: " $1}'
 
 cd "$CI_PRIMARY_REPOSITORY_PATH"
 
+echo "--- caches ---"
+# Xcode Cloud keeps DerivedData between builds of a workflow (the "Clean" box on
+# Start Build discards it). Park gradle and Kotlin/Native state there so
+# dependency downloads, the K/N distribution and the gradle build cache survive
+# across builds instead of starting from nothing every time. Symlinks rather
+# than env vars because the xcodebuild gradle phase inherits no environment.
+CACHE_ROOT="${CI_DERIVED_DATA_PATH:-$HOME/Library/Developer/Xcode/DerivedData}/stone-cache"
+echo "cache root: $CACHE_ROOT"
+if [ -d "$CACHE_ROOT" ]; then
+  echo "cache restored from a previous build:"; du -sh "$CACHE_ROOT"/* 2>/dev/null || true
+else
+  echo "no cache from a previous build"
+fi
+for pair in gradle:.gradle konan:.konan; do
+  name="${pair%%:*}"; dot="${pair##*:}"
+  mkdir -p "$CACHE_ROOT/$name"
+  rm -rf "$HOME/$dot"
+  ln -sfn "$CACHE_ROOT/$name" "$HOME/$dot"
+done
+
+# Print every gradle task that takes more than 5s, so build time is measured
+# rather than guessed. Shows up in the xcodebuild log for the archive step too.
+mkdir -p "$HOME/.gradle/init.d"
+cat > "$HOME/.gradle/init.d/task-timing.gradle" <<'INIT'
+def starts = [:]
+gradle.taskGraph.beforeTask { t -> starts[t.path] = System.currentTimeMillis() }
+gradle.taskGraph.afterTask { t ->
+  def ms = System.currentTimeMillis() - (starts[t.path] ?: System.currentTimeMillis())
+  if (ms > 5000) println String.format("TASK-TIME %6.1fs %s%s", ms / 1000.0, t.path, t.state.upToDate ? " UP-TO-DATE" : t.state.skipped ? " SKIPPED" : "")
+}
+INIT
+
 echo "--- java 17 ---"
 # Temurin 17: the version the project's toolchain expects. Java 8 will not work.
 brew install --quiet openjdk@17
@@ -81,7 +113,7 @@ echo "--- gradle heaps ---"
 # project's gradle.properties, so size them for a 64 GB box here and leave the
 # upstream file alone. Applies to the xcodebuild gradle phase too: same user.
 mkdir -p "$HOME/.gradle"
-cat >> "$HOME/.gradle/gradle.properties" <<'GRADLE'
+cat > "$HOME/.gradle/gradle.properties" <<'GRADLE'
 kotlin.native.jvmArgs=-Xmx24g
 kotlin.daemon.jvmargs=-Xmx12g
 org.gradle.jvmargs=-Xmx8g
