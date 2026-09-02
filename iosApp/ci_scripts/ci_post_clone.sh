@@ -111,11 +111,15 @@ echo "--- gradle heaps ---"
 # Xcode Cloud machine. GRADLE_USER_HOME properties take precedence over the
 # project's gradle.properties, so size them for a 64 GB box here and leave the
 # upstream file alone. Applies to the xcodebuild gradle phase too: same user.
+#
+# preferIPv4Stack: four consecutive builds failed resolving dl.google.com with
+# java.net "No route to host", which is what Java reports when it picks a host's
+# AAAA record on a machine without an IPv6 route.
 mkdir -p "$HOME/.gradle"
 cat > "$HOME/.gradle/gradle.properties" <<'GRADLE'
-kotlin.native.jvmArgs=-Xmx24g
-kotlin.daemon.jvmargs=-Xmx12g
-org.gradle.jvmargs=-Xmx8g
+kotlin.native.jvmArgs=-Xmx24g -Djava.net.preferIPv4Stack=true
+kotlin.daemon.jvmargs=-Xmx12g -Djava.net.preferIPv4Stack=true
+org.gradle.jvmargs=-Xmx8g -Djava.net.preferIPv4Stack=true
 GRADLE
 
 echo "--- firebase plist ---"
