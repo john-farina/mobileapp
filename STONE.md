@@ -10,7 +10,7 @@ Everything upstream does still works. This fork changes **two files**.
 
 | File | Change |
 | --- | --- |
-| `gradle.properties` | `bugUrl=https://stone-channel-production.up.railway.app` |
+| `gradle.properties` | `bugUrl=https://stone-channel-production.up.railway.app`; `googleAuthEnabled`/`appleAuthEnabled`/`githubAuthEnabled=false` (Core account sign-in runs on Firebase, which this build only has a dummy config for, and `FIROAuthProvider` crashes on it) |
 | `iosApp/Configuration/Config.xcconfig` | `TEAM_ID`, `BUNDLE_ID=com.johnfarina.stone`, `APP_NAME=Stone` |
 | `iosApp/iosApp.xcodeproj/project.pbxproj` | dropped the target-level `APP_NAME`/`BUNDLE_ID` overrides |
 | `androidApp/.../values/strings.xml` | `app_name` -> Stone |
