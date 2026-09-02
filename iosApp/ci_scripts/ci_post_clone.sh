@@ -15,26 +15,6 @@ sysctl -n hw.ncpu | awk '{print "cores: " $1}'
 
 cd "$CI_PRIMARY_REPOSITORY_PATH"
 
-echo "--- caches ---"
-# Xcode Cloud keeps DerivedData between builds of a workflow (the "Clean" box on
-# Start Build discards it). Park gradle and Kotlin/Native state there so
-# dependency downloads, the K/N distribution and the gradle build cache survive
-# across builds instead of starting from nothing every time. Symlinks rather
-# than env vars because the xcodebuild gradle phase inherits no environment.
-CACHE_ROOT="${CI_DERIVED_DATA_PATH:-$HOME/Library/Developer/Xcode/DerivedData}/stone-cache"
-echo "cache root: $CACHE_ROOT"
-if [ -d "$CACHE_ROOT" ]; then
-  echo "cache restored from a previous build:"; du -sh "$CACHE_ROOT"/* 2>/dev/null || true
-else
-  echo "no cache from a previous build"
-fi
-for pair in gradle:.gradle konan:.konan; do
-  name="${pair%%:*}"; dot="${pair##*:}"
-  mkdir -p "$CACHE_ROOT/$name"
-  rm -rf "$HOME/$dot"
-  ln -sfn "$CACHE_ROOT/$name" "$HOME/$dot"
-done
-
 # Print every gradle task that takes more than 5s, so build time is measured
 # rather than guessed. Shows up in the xcodebuild log for the archive step too.
 mkdir -p "$HOME/.gradle/init.d"
