@@ -62,11 +62,23 @@ export-compliance answers before it is installable.
 
 ## If it fails
 
-The post-clone log is the first place to look — it prints the machine's memory
-and core count, which matters: the GitHub-hosted runners were abandoned because
-7 GB was not enough for `linkPodReleaseFrameworkIosArm64`. If Xcode Cloud hits
-the same wall the log will say so plainly, and `STONE.md` has the heap
-measurements that were already tried.
+Download the logs from the build's Archive action in App Store Connect; the
+GitHub check summary strips the detail. The post-clone log prints the machine
+(64 GB, 12 cores as of 2026-09) and every gradle task over 5 s as `TASK-TIME`.
+
+Failures already diagnosed, all fixed in `ci_post_clone.sh`:
+
+| Symptom | Cause |
+| --- | --- |
+| `PhaseScriptExecution failed`, right after pods compile | the `Build composeApp` phase runs gradle inside xcodebuild with no environment; brew's JDK is keg-only. Fixed by linking it under `~/Library/Java/JavaVirtualMachines` |
+| `Errno::ENOENT ... FirebaseFirestoreGRPCCPPBinary/...` in `podInstallSyntheticIos` | `:experimental:` and `:composeApp:` synthetic pod installs ran in parallel in one gradle run. Fixed by pre-running them sequentially |
+| `java.lang.OutOfMemoryError: Java heap space` in the Kotlin compile | upstream heaps (12g/6g/4g) overflow here. `~/.gradle/gradle.properties` sets 24g/12g/8g and outranks the project file |
+| `Build input file cannot be found: .../GoogleService-Info.plist` | the path is gitignored; the dummy is copied into place |
+| `No route to host` fetching from `dl.google.com`, four builds in a row | Java chose the host's IPv6 address on a machine with no IPv6 route. `-Djava.net.preferIPv4Stack=true` on all gradle JVMs |
+
+Not available: a cache between builds. `CI_DERIVED_DATA_PATH` is empty at
+post-clone time on every build, so gradle, Kotlin/Native and CocoaPods all
+start cold. A cold build is about 42 minutes.
 
 ## The GitHub Actions workflow
 
