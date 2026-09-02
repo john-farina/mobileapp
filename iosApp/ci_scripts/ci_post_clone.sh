@@ -39,12 +39,31 @@ done
 # rather than guessed. Shows up in the xcodebuild log for the archive step too.
 mkdir -p "$HOME/.gradle/init.d"
 cat > "$HOME/.gradle/init.d/task-timing.gradle" <<'INIT'
-def starts = [:]
-gradle.taskGraph.beforeTask { t -> starts[t.path] = System.currentTimeMillis() }
-gradle.taskGraph.afterTask { t ->
-  def ms = System.currentTimeMillis() - (starts[t.path] ?: System.currentTimeMillis())
-  if (ms > 5000) println String.format("TASK-TIME %6.1fs %s%s", ms / 1000.0, t.path, t.state.upToDate ? " UP-TO-DATE" : t.state.skipped ? " SKIPPED" : "")
+// Build-service form: taskGraph.afterTask listeners fail under the configuration cache.
+import javax.inject.Inject
+import org.gradle.api.Plugin
+import org.gradle.api.invocation.Gradle
+import org.gradle.api.services.BuildService
+import org.gradle.api.services.BuildServiceParameters
+import org.gradle.build.event.BuildEventsListenerRegistry
+import org.gradle.tooling.events.FinishEvent
+import org.gradle.tooling.events.OperationCompletionListener
+import org.gradle.tooling.events.task.TaskFinishEvent
+
+abstract class TaskTiming implements BuildService<BuildServiceParameters.None>, OperationCompletionListener {
+  void onFinish(FinishEvent event) {
+    if (!(event instanceof TaskFinishEvent)) return
+    long ms = event.result.endTime - event.result.startTime
+    if (ms > 5000) println String.format("TASK-TIME %6.1fs %s", ms / 1000.0, event.descriptor.taskPath)
+  }
 }
+abstract class TaskTimingPlugin implements Plugin<Gradle> {
+  @Inject abstract BuildEventsListenerRegistry getRegistry()
+  void apply(Gradle gradle) {
+    registry.onTaskCompletion(gradle.sharedServices.registerIfAbsent("taskTiming", TaskTiming) {})
+  }
+}
+apply plugin: TaskTimingPlugin
 INIT
 
 echo "--- java 17 ---"
