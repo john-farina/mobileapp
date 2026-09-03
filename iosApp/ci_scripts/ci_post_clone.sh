@@ -139,4 +139,17 @@ echo "--- cocoapods ---"
 ./gradlew :experimental:podInstallSyntheticIos --no-daemon
 ./gradlew :composeApp:podInstallSyntheticIos --no-daemon
 
+echo "--- kotlin framework ---"
+# Build the Kotlin framework here, not inside xcodebuild. The archive phase's
+# gradle run has failed 5 of 13 builds with 'No route to host' fetching
+# dependencies; post-clone's gradle has never failed once. Same task and
+# parameters the composeApp podspec's "Build composeApp" phase uses, so that
+# phase finds everything UP-TO-DATE. Also puts TASK-TIME lines in a log with
+# live timestamps.
+./gradlew :composeApp:syncFramework \
+  -Pkotlin.native.cocoapods.platform=iphoneos \
+  -Pkotlin.native.cocoapods.archs=arm64 \
+  -Pkotlin.native.cocoapods.configuration=Release \
+  --no-daemon
+
 echo "--- ready ---"
