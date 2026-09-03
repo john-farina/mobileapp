@@ -2074,7 +2074,7 @@ fun WatchDetails(
         }
     }
     Spacer(modifier = Modifier.height(5.dp))
-    StoneChannelPanel(watch)
+    StoneChannelPanel(watch, navBarNav)
     InlineDebugOptions(navBarNav, snackbarDisplay)
     val firmwareUpdateAvailable =
         (watch as? ConnectedPebble.Firmware)?.firmwareUpdateAvailable?.result

@@ -31,6 +31,9 @@ object PebbleRoutes {
     data object StoneChannelsRoute : CoreRoute
 
     @Serializable
+    data object WatchLogsRoute : CoreRoute
+
+    @Serializable
     data class WatchappSettingsRoute(
         val watchIdentifier: String,
         val title: String,
@@ -301,6 +304,9 @@ fun NavGraphBuilder.addPebbleRoutes(
     }
     composable<PebbleRoutes.StoneChannelsRoute> {
         StoneChannelsScreen(coreNav)
+    }
+    composable<PebbleRoutes.WatchLogsRoute> {
+        WatchLogsScreen(coreNav)
     }
     composable<PebbleRoutes.WatchappSettingsRoute> {
         val route: PebbleRoutes.WatchappSettingsRoute = it.toRoute()

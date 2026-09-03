@@ -94,6 +94,7 @@ import coredevices.util.CoreConfigFlow
 import coredevices.util.Platform
 import coredevices.util.emailOrNull
 import coredevices.util.isIOS
+import coredevices.util.CommonBuildKonfig
 import dev.gitlive.firebase.Firebase
 import dev.gitlive.firebase.auth.FirebaseUser
 import dev.gitlive.firebase.auth.auth
@@ -189,11 +190,18 @@ fun BugReportScreen(
         var watchScreenshot by remember { mutableStateOf<ImageBitmap?>(null) }
         var screenshotLoading by remember { mutableStateOf(false) }
 
+        val signInPossible = CommonBuildKonfig.GOOGLE_AUTH_ENABLED ||
+                CommonBuildKonfig.APPLE_AUTH_ENABLED ||
+                CommonBuildKonfig.GITHUB_AUTH_ENABLED
+
         fun sendLogs(shareLocally: Boolean) {
             if (isThirdPartyTest()) return
 
-            // Check if user is signed in before proceeding
-            if (user == null && !shareLocally) {
+            // Check if user is signed in before proceeding. A build with every
+            // sign-in provider disabled cannot sign in, and its bugUrl server
+            // (Stone's) takes anonymous reports, so the gate only applies when a
+            // provider exists.
+            if (user == null && !shareLocally && signInPossible) {
                 setStatus("Please sign in before submitting a bug report")
                 return
             }
@@ -204,7 +212,7 @@ fun BugReportScreen(
             scope.launch {
                 // Extract Google ID token from current user
                 val currentUser = user
-                if (currentUser == null && !shareLocally) {
+                if (currentUser == null && !shareLocally && signInPossible) {
                     setStatus("Please sign in before submitting a bug report")
                     setSending(false)
                     return@launch
