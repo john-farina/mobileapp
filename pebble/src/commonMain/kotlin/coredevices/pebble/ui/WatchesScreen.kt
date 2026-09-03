@@ -598,6 +598,7 @@ fun WatchesScreen(navBarNav: NavBarNav, topBarParams: TopBarParams) {
                                 bluetoothState = bluetoothEnabled,
                                 allowedToConnect = !showOtherPebbleAppsWarningAndPreventConnection,
                                 navBarNav = navBarNav,
+                                snackbarDisplay = topBarParams,
                             )
                             is DeviceListEntry.Ring -> RingItem(
                                 ring = entry.device,
@@ -1223,6 +1224,7 @@ fun WatchItem(
     bluetoothState: BluetoothState,
     allowedToConnect: Boolean,
     navBarNav: NavBarNav,
+    snackbarDisplay: SnackbarDisplay,
 ) {
     ListItem(
         headlineContent = {
@@ -1235,6 +1237,7 @@ fun WatchItem(
                     bluetoothState = bluetoothState,
                     allowedToConnect = allowedToConnect,
                     navBarNav = navBarNav,
+                    snackbarDisplay = snackbarDisplay,
                 )
             }
         },
@@ -1982,6 +1985,7 @@ fun WatchDetails(
     bluetoothState: BluetoothState,
     allowedToConnect: Boolean,
     navBarNav: NavBarNav,
+    snackbarDisplay: SnackbarDisplay,
 ) {
     val appContext: AppContext = koinInject()
     val pebbleFeatures = koinInject<PebbleFeatures>()
@@ -2070,6 +2074,8 @@ fun WatchDetails(
         }
     }
     Spacer(modifier = Modifier.height(5.dp))
+    StoneChannelPanel(watch)
+    InlineDebugOptions(navBarNav, snackbarDisplay)
     val firmwareUpdateAvailable =
         (watch as? ConnectedPebble.Firmware)?.firmwareUpdateAvailable?.result
     val firmwareUpdater = watch as? ConnectedPebble.Firmware

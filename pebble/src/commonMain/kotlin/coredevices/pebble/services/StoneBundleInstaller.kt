@@ -1,6 +1,7 @@
 package coredevices.pebble.services
 
 import co.touchlab.kermit.Logger
+import io.rebble.libpebblecommon.connection.ConnectedPebble
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -71,4 +72,23 @@ class StoneBundleInstaller(
         logger.i { "verified ${build.version}: ${bytes.size} bytes, sha256 ok" }
         destination
     }.onFailure { logger.w(it) { "bundle download failed: ${it.message}" } }
+
+    /**
+     * Download, verify and send [build] to [firmware]. [onStatus] receives the
+     * user-facing phase so callers show progress without owning the sequence.
+     */
+    suspend fun installOnWatch(
+        channel: String,
+        build: StoneBuild,
+        firmware: ConnectedPebble.Firmware,
+        destination: Path,
+        onStatus: (String) -> Unit,
+    ): Result<Unit> {
+        onStatus("Downloading…")
+        val path = download(channel, build, destination).getOrElse { return Result.failure(it) }
+        onStatus("Verified, installing…")
+        return runCatching { firmware.sideloadFirmware(path) }
+            .onSuccess { onStatus("Sent to watch") }
+            .onFailure { onStatus(it.message ?: "Install failed") }
+    }
 }

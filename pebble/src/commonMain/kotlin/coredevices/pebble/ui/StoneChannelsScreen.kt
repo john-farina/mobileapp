@@ -85,25 +85,11 @@ fun StoneChannelsScreen(coreNav: CoreNav) {
             return
         }
         scope.launch {
-            status[build.version] = "Downloading…"
-            val path = getTempFwPath(appContext)
-            installer.download(channelName, build, path)
-                .onFailure {
-                    status[build.version] = it.message ?: "Download failed"
-                    snackbar.showSnackbar(it.message ?: "Download failed")
-                }
-                .onSuccess {
-                    status[build.version] = "Verified, installing…"
-                    runCatching {
-                        firmware.sideloadFirmware(path)
-                    }.onFailure { e ->
-                        status[build.version] = e.message ?: "Install failed"
-                        snackbar.showSnackbar(e.message ?: "Install failed")
-                    }.onSuccess {
-                        status[build.version] = "Sent to watch"
-                        snackbar.showSnackbar("Sent ${build.version} to the watch")
-                    }
-                }
+            installer.installOnWatch(channelName, build, firmware, getTempFwPath(appContext)) {
+                status[build.version] = it
+            }
+                .onFailure { snackbar.showSnackbar(it.message ?: "Install failed") }
+                .onSuccess { snackbar.showSnackbar("Sent ${build.version} to the watch") }
         }
     }
 
